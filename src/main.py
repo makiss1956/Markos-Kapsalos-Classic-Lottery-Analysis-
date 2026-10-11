@@ -17,7 +17,6 @@ import sys
 from pathlib import Path
 from typing import Any, Dict, Optional
 import pandas as pd
-from sklearn.ensemble import RandomForestClassifier
 
 SRC_DIR = Path(__file__).resolve().parent
 ROOT_DIR = SRC_DIR.parent
@@ -134,8 +133,6 @@ def run_pipeline() -> Dict[str, Any]:
     # ---------------------------------------------------------
     logger.info("STEP 7 - Generate Prediction with Roll-over / Winner Analysis")
     
-    # Φόρτωση του μεγάλου αρχείου με τις ενδείξεις JACKPOT/WINNER για την ανάλυση κατάστασης
-    # (Βεβαιωθείτε ότι το αρχείο βρίσκεται στον φάκελο του έργου σας ή δώστε τη σωστή διαδρομή)
     csv_file_path = "ΚΑΤΑΛΟΓΟΣ ΚΛΗΡΩΣΕΩΝ 2012 -2026 ΜΕ ΕΝΔΕΙΞΗ ΤΖΑΚΠΟΤ.txt"
     try:
         df_history = pd.read_csv(csv_file_path, sep=';')
@@ -146,19 +143,9 @@ def run_pipeline() -> Dict[str, Any]:
         roll_over_pool = df_history[df_history['Is_Jackpot'] == 1]
         winner_pool = df_history[df_history['Is_Jackpot'] == 0]
 
-        # Εκπαίδευση Random Forest Classifier για πρόβλεψη της επόμενης κατάστασης
-        df_history['Prev_Is_Jackpot'] = df_history['Is_Jackpot'].shift(1)
-        df_model = df_history.dropna(subset=['Prev_Is_Jackpot'])
-        
-        X = df_model[['Prev_Is_Jackpot']]
-        y = df_model['Is_Jackpot']
-        
-        clf = RandomForestClassifier(n_estimators=100, random_state=42)
-        clf.fit(X, y)
-        
-        # Πρόβλεψη για την επόμενη κλήρωση
+        # Αυτόνομη πρόβλεψη κατάστασης (Pure Python) με βάση την τελευταία τιμή
         last_status_val = df_history.iloc[-1]['Is_Jackpot']
-        next_status_pred = clf.predict([[last_status_val]])[0]
+        next_status_pred = 1 if last_status_val == 1 else 0
         next_status_str = "JACKPOT (Roll-over)" if next_status_pred == 1 else "WINNER"
         logger.info("1. Εκτίμηση επόμενης κλήρωσης (Roll-over/Winner): %s", next_status_str)
         
@@ -180,7 +167,6 @@ def run_pipeline() -> Dict[str, Any]:
         primary_candidates_3_1 = sorted(top_mains[:3])
         euro_candidates_3_1 = sorted(top_euros[:1])
         
-        # Για αποθήκευση και ειδοποίηση επιλέγουμε τη βασική πρόβλεψη (π.χ. 3+1 ή όπως ορίζει το σύστημά σας)
         primary_candidates = primary_candidates_3_1
         joker_candidates = euro_candidates_3_1
         
