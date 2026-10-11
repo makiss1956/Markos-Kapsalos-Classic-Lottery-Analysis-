@@ -133,7 +133,8 @@ def run_pipeline() -> Dict[str, Any]:
     # ---------------------------------------------------------
     logger.info("STEP 7 - Generate Prediction with Roll-over / Winner Analysis")
     
-    csv_file_path = "ΚΑΤΑΛΟΓΟΣ ΚΛΗΡΩΣΕΩΝ 2012 -2026 ΜΕ ΕΝΔΕΙΞΗ ΤΖΑΚΠΟΤ.txt"
+    # Διορθωμένη διαδρομή σύμφωνα με το GitHub repository σας
+    csv_file_path = "data/eurojackpot_raw_history.csv"
     try:
         df_history = pd.read_csv(csv_file_path, sep=';')
         # Μετατροπή Status σε αριθμητικό (1 για JACKPOT/Roll-over, 0 για WINNER)
