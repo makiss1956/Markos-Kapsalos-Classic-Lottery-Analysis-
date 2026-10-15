@@ -79,7 +79,7 @@ class EurojackpotWebScraper:
             if isinstance(raw_time, int):
                 draw_date_value = datetime.fromtimestamp(raw_time / 1000, tz=timezone.utc).strftime("%Y-%m-%d")
             elif isinstance(raw_time, str):
-                draw_date_value = raw_time.split("T")[0]
+                draw_date_value = raw_time.split("T")
 
             return {
                 "draw_id": raw_draw.get("drawId"),
@@ -230,7 +230,7 @@ class EurojackpotWebScraper:
                 raw_draws = data.get("content", [])
             elif isinstance(data, list):
                 raw_draws = data
-            else:
+            else_ι:
                 logger.error(
                     "Unexpected OPAP response type for %s - %s: %s",
                     start_date,
