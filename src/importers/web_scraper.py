@@ -145,7 +145,7 @@ class EurojackpotWebScraper:
                 key=lambda draw: draw["draw_date"],
                 reverse=True,
             )
-            latest = parsed_draws[0]
+            latest = parsed_draws
             logger.info(
                 "Latest OPAP draw: %s | Main=%s | Euro=%s",
                 latest["draw_date"],
@@ -180,7 +180,7 @@ class EurojackpotWebScraper:
 
             if draws:
                 draws.sort(key=lambda d: d["draw_date"], reverse=True)
-                latest = draws[0]
+                latest = draws
                 logger.info(
                     "Fallback latest draw: %s | Main=%s | Euro=%s",
                     latest["draw_date"],
