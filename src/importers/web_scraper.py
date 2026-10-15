@@ -42,7 +42,7 @@ class EurojackpotWebScraper:
         )
 
     def _parse_draw(self, raw_draw: Dict[str, Any]) -> Optional[Dict[str, Any]]:
-        """Βοηθητική μέθοδος για τη δομή και το φιλτράρισμα των δεδομένων του ΟΠΑΠ."""
+        """Βοηθητική μέθοδος για τη δομή, το φιλτράρισμα και την επικύρωση των δεδομένων."""
         try:
             if "winningNumbers" not in raw_draw:
                 return None
@@ -50,7 +50,7 @@ class EurojackpotWebScraper:
             winning_nums = raw_draw["winningNumbers"].get("list", [])
             wn = raw_draw["winningNumbers"]
             
-            # Υποστήριξη όλων των εναλλακτικών ονομάτων για τα Euro Numbers (για να περνάνε τα tests)
+            # Υποστήριξη όλων των εναλλακτικών ονομάτων για τα Euro Numbers
             euro_nums = []
             if "sideClassNum" in wn:
                 euro_nums = wn["sideClassNum"]
@@ -59,9 +59,19 @@ class EurojackpotWebScraper:
             elif "bonus" in wn:
                 euro_nums = wn["bonus"]
 
-            # Αυστηρός έλεγχος: 5 βασικοί αριθμοί και 2 Euro numbers
+            # 1. Αυστηρός έλεγχος πλήθους: 5 βασικοί αριθμοί και 2 Euro numbers
             if len(winning_nums) != 5 or len(euro_nums) != 2:
                 return None
+
+            # 2. Αυστηρός έλεγχος τιμών (Validation): 1-50 για κύριους, 1-12 για Euro
+            if any(num < 1 or num > 50 for num in winning_nums):
+                return None
+            if any(num < 1 or num > 12 for num in euro_nums):
+                return None
+
+            # 3. Ταξινόμηση αριθμών σε αύξουσα σειρά (Απαίτηση των tests)
+            sorted_winning_nums = sorted(winning_nums)
+            sorted_euro_nums = sorted(euro_nums)
 
             # Διαχείριση ημερομηνίας: Υποστήριξη timestamp (tests) και ISO string (ζωντανό API)
             raw_time = raw_draw.get("drawTime")
@@ -74,9 +84,9 @@ class EurojackpotWebScraper:
             return {
                 "draw_id": raw_draw.get("drawId"),
                 "draw_date": draw_date_value,
-                "primary_numbers": winning_nums,
-                "euro_numbers": euro_nums,
-                "jackpot": raw_draw.get("prizeCategories", [{}])[0].get("jackpot", 0) if isinstance(raw_draw.get("prizeCategories"), list) else 0
+                "primary_numbers": sorted_winning_nums,
+                "euro_numbers": sorted_euro_nums,
+                "jackpot": raw_draw.get("prizeCategories", [{}]).get("jackpot", 0) if isinstance(raw_draw.get("prizeCategories"), list) else 0
             }
         except Exception as e:
             logger.error("Σφάλμα κατά την ανάλυση της κλήρωσης: %s", e)
@@ -89,8 +99,6 @@ class EurojackpotWebScraper:
         """
         Fetch the latest available Eurojackpot draw.
         Falls back to fetching a recent date range if /last-results returns 404.
-        Returns:
-            Normalized draw dictionary or None if unavailable.
         """
         url = f"{self.BASE_URL}/last-results"
         try:
@@ -161,8 +169,6 @@ class EurojackpotWebScraper:
     def _fetch_latest_via_fallback(self) -> Optional[Dict[str, Any]]:
         """
         Fallback method: tries multiple approaches to get the latest draw.
-        1. Date range of last 30 days
-        2. Direct /last-result-and-active endpoint
         """
         try:
             today = datetime.now(timezone.utc).date()
@@ -249,5 +255,3 @@ class EurojackpotWebScraper:
             return parsed_draws
 
         except requests.RequestException as exc:
-            logger.error("OPAP request failed for %s - %s: %s", start_date, end_date, exc)
-            return []
