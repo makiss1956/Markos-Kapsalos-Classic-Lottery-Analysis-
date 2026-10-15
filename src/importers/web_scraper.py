@@ -145,7 +145,7 @@ class EurojackpotWebScraper:
                 key=lambda draw: draw["draw_date"],
                 reverse=True,
             )
-            latest = parsed_draws
+            latest = parsed_draws[0]
             logger.info(
                 "Latest OPAP draw: %s | Main=%s | Euro=%s",
                 latest["draw_date"],
@@ -180,7 +180,7 @@ class EurojackpotWebScraper:
 
             if draws:
                 draws.sort(key=lambda d: d["draw_date"], reverse=True)
-                latest = draws
+                latest = draws[0]
                 logger.info(
                     "Fallback latest draw: %s | Main=%s | Euro=%s",
                     latest["draw_date"],
@@ -210,20 +210,11 @@ class EurojackpotWebScraper:
         logger.error("All fallback methods failed — no draw retrieved")
         return None
 
-    def fetch_draws_range(
-        self,
-        start_date: str,
-        end_date: str,
-    ) -> List[Dict[str, Any]]:
-        """
-        Fetch Eurojackpot draws between two dates (YYYY-MM-DD).
-        """
+    def fetch_draws_range(self, start_date: str, end_date: str) -> List[Dict[str, Any]]:
+        """Fetch Eurojackpot draws between two dates (YYYY-MM-DD)."""
         url = f"{self.BASE_URL}/draw-date/{start_date}/{end_date}"
         try:
-            response = self.session.get(
-                url,
-                timeout=self.REQUEST_TIMEOUT,
-            )
+            response = self.session.get(url, timeout=self.REQUEST_TIMEOUT)
             response.raise_for_status()
             data = response.json()
             if isinstance(data, dict):
@@ -253,5 +244,6 @@ class EurojackpotWebScraper:
                 len(parsed_draws),
             )
             return parsed_draws
-
         except requests.RequestException as exc:
+            logger.error("OPAP request failed for %s - %s: %s", start_date, end_date, exc)
+            return []
