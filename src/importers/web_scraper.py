@@ -230,7 +230,7 @@ class EurojackpotWebScraper:
                 raw_draws = data.get("content", [])
             elif isinstance(data, list):
                 raw_draws = data
-            else_ι:
+            else:
                 logger.error(
                     "Unexpected OPAP response type for %s - %s: %s",
                     start_date,
