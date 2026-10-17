@@ -20,7 +20,12 @@ try:
         print(f"✅ Η σύνδεση ΠΕΤΥΧΕ! (Status Code: 200)")
         
         # Εξαγωγή της τελευταίας κλήρωσης
-        latest_draw = data[0] if isinstance(data, list) else data.get("content", [data])[0]
+        if isinstance(data, list) and len(data) > 0:
+            latest_draw = data[0]
+        elif isinstance(data, dict) and "content" in data and len(data["content"]) > 0:
+            latest_draw = data["content"][0]
+        else:
+            latest_draw = data
             
         print("\n--- ΧΘΕΣΙΝΗ ΚΛΗΡΩΣΗ (Ή ΠΙΟ ΠΡΟΣΦΑΤΗ) ---")
         print(f"ID Κλήρωσης: {latest_draw.get('drawId')}")
