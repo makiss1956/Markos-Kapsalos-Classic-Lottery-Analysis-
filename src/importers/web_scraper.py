@@ -22,8 +22,8 @@ class EurojackpotWebScraper:
     """Retrieve Eurojackpot draws from the official OPAP API."""
 
     GAME_ID = 5104  # Ο σωστός κωδικός του Eurojackpot στον ΟΠΑΠ
-    # Χρήση της έκδοσης v1.0 για τα endpoints των αποτελεσμάτων κληρώσεων
-    BASE_URL = f"https://opap.gr{GAME_ID}"
+    # Διορθωμένο και έγκυρο API endpoint του ΟΠΑΠ
+    BASE_URL = f"https://api.opap.gr/games/v1.0/games/{GAME_ID}"
     REQUEST_TIMEOUT = 30
 
     def __init__(self) -> None:
@@ -188,6 +188,12 @@ class EurojackpotWebScraper:
             logger.error("OPAP request failed for %s - %s: %s", start_date, end_date, exc)
             return []
 
+    def fetch_year_draws(self, year: int) -> List[Dict[str, Any]]:
+        """Fetch all draws for a specific year using the date range endpoint."""
+        start_date = f"{year}-01-01"
+        end_date = f"{year}-12-31"
+        return self.fetch_draws_range(start_date, end_date)
+
     def _fetch_latest_via_fallback(self) -> Optional[Dict[str, Any]]:
         """
         Fallback method: tries multiple approaches to get the latest draw.
@@ -211,9 +217,8 @@ class EurojackpotWebScraper:
                 )
                 return latest
 
-            # Try 2: direct endpoint του v1.0
             logger.warning("No draws in date range — trying alternative endpoint")
-            url = f"https://opap.gr{self.GAME_ID}/last-result-and-active"
+            url = f"https://api.opap.gr/games/v1.0/games/{self.GAME_ID}/last-result-and-active"
             try:
                 resp = self.session.get(url, timeout=self.REQUEST_TIMEOUT)
                 if resp.status_code == 200:
