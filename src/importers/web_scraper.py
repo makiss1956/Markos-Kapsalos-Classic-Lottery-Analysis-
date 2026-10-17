@@ -79,14 +79,14 @@ class EurojackpotWebScraper:
             if isinstance(raw_time, int):
                 draw_date_value = datetime.fromtimestamp(raw_time / 1000, tz=timezone.utc).strftime("%Y-%m-%d")
             elif isinstance(raw_time, str):
-                draw_date_value = raw_time.split("T")
+                draw_date_value = raw_time.split("T")[0]
 
             return {
                 "draw_id": raw_draw.get("drawId"),
                 "draw_date": draw_date_value,
                 "primary_numbers": sorted_winning_nums,
                 "euro_numbers": sorted_euro_nums,
-                "jackpot": raw_draw.get("prizeCategories", [{}]).get("jackpot", 0) if isinstance(raw_draw.get("prizeCategories"), list) else 0
+                "jackpot": raw_draw.get("prizeCategories", [{}])[0].get("jackpot", 0) if isinstance(raw_draw.get("prizeCategories"), list) else 0
             }
         except Exception as e:
             logger.error("Σφάλμα κατά την ανάλυση της κλήρωσης: %s", e)
@@ -166,6 +166,28 @@ class EurojackpotWebScraper:
             )
             return self._fetch_latest_via_fallback()
 
+    def fetch_draws_range(self, start_date: str, end_date: str) -> List[Dict[str, Any]]:
+        """Fetch draws within a specific date range (YYYY-MM-DD)."""
+        url = f"{self.BASE_URL}/draw-date/{start_date}/{end_date}"
+        try:
+            response = self.session.get(url, timeout=self.REQUEST_TIMEOUT)
+            response.raise_for_status()
+            data = response.json()
+            
+            raw_draws = data.get("content", []) if isinstance(data, dict) else data
+            if not isinstance(raw_draws, list):
+                return []
+                
+            parsed_draws = []
+            for raw in raw_draws:
+                parsed = self._parse_draw(raw)
+                if parsed:
+                    parsed_draws.append(parsed)
+            return parsed_draws
+        except Exception as exc:
+            logger.error("OPAP request failed for %s - %s: %s", start_date, end_date, exc)
+            return []
+
     def _fetch_latest_via_fallback(self) -> Optional[Dict[str, Any]]:
         """
         Fallback method: tries multiple approaches to get the latest draw.
@@ -201,49 +223,8 @@ class EurojackpotWebScraper:
                         if parsed:
                             logger.info("Retrieved from alternative endpoint: %s", parsed["draw_date"])
                             return parsed
-            except Exception as e:
-                logger.debug("Alternative endpoint failed: %s", e)
-
-        except Exception as e:
-            logger.error("Fallback failed: %s", e)
-
-        logger.error("All fallback methods failed — no draw retrieved")
-        return None
-
-    def fetch_draws_range(self, start_date: str, end_date: str) -> List[Dict[str, Any]]:
-        """Fetch Eurojackpot draws between two dates (YYYY-MM-DD)."""
-        url = f"{self.BASE_URL}/draw-date/{start_date}/{end_date}"
-        try:
-            response = self.session.get(url, timeout=self.REQUEST_TIMEOUT)
-            response.raise_for_status()
-            data = response.json()
-            if isinstance(data, dict):
-                raw_draws = data.get("content", [])
-            elif isinstance(data, list):
-                raw_draws = data
-            else:
-                logger.error(
-                    "Unexpected OPAP response type for %s - %s: %s",
-                    start_date,
-                    end_date,
-                    type(data).__name__,
-                )
-                return []
-
-            parsed_draws: List[Dict[str, Any]] = []
-            for raw_draw in raw_draws:
-                parsed = self._parse_draw(raw_draw)
-                if parsed is not None:
-                    parsed_draws.append(parsed)
-
-            parsed_draws.sort(key=lambda draw: draw["draw_date"])
-            logger.info(
-                "OPAP range %s to %s: %d valid draws",
-                start_date,
-                end_date,
-                len(parsed_draws),
-            )
-            return parsed_draws
-        except requests.RequestException as exc:
-            logger.error("OPAP request failed for %s - %s: %s", start_date, end_date, exc)
-            return []
+            except Exception:
+                logger.error("All fallback methods failed — no draw retrieved")
+            return None
+        except Exception:
+            return None
