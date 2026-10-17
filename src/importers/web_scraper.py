@@ -14,6 +14,8 @@ logger = logging.getLogger(__name__)
 class EurojackpotWebScraper:
     """Retrieve Eurojackpot draws with full support for OPAP structures and public mirrors."""
 
+    GAME_ID = 5104
+    BASE_URL = f"https://api.opap.gr/games/v1.0/games/{GAME_ID}"
     REQUEST_TIMEOUT = 10
 
     def __init__(self) -> None:
@@ -109,20 +111,19 @@ class EurojackpotWebScraper:
 
     def fetch_draws_range(self, start_date: str, end_date: str) -> List[Dict[str, Any]]:
         """Fetch draws within date range, supporting direct session GET (mocked in tests)."""
+        url = f"{self.BASE_URL}/draw-date/{start_date}/{end_date}"
         try:
-            url = f"https://api.opap.gr/games/v1.0/games/5104/draw-date/{start_date}/{end_date}"
             response = self.session.get(url, timeout=self.REQUEST_TIMEOUT)
-            if response.status_code == 200:
-                data = response.json()
-                raw_draws = data.get("content", []) if isinstance(data, dict) else data
-                if isinstance(raw_draws, list):
-                    parsed_list = []
-                    for raw in raw_draws:
-                        parsed = self._parse_draw(raw)
-                        if parsed:
-                            parsed_list.append(parsed)
-                    if parsed_list:
-                        return parsed_list
+            response.raise_for_status()
+            data = response.json()
+            raw_draws = data.get("content", []) if isinstance(data, dict) else data
+            if isinstance(raw_draws, list):
+                parsed_list = []
+                for raw in raw_draws:
+                    parsed = self._parse_draw(raw)
+                    if parsed:
+                        parsed_list.append(parsed)
+                return parsed_list
         except Exception as exc:
             logger.debug("Range request failed: %s", exc)
 
