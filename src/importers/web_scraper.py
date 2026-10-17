@@ -99,7 +99,7 @@ class EurojackpotWebScraper:
                     data = response.json()
                     parsed = self._parse_draw(data)
                     if parsed:
-                        logger.info("Latest public draw retrieved: %s | Main=%s | Euro=%s", parsed["draw_date"], parsed["primary_numbers"], parsed["euro_numbers"])
+                        logger.info("Latest public draw retrieved: %s", parsed["draw_date"])
                         return parsed
             except Exception as exc:
                 logger.debug("Mirror %s failed: %s", url, exc)
@@ -108,9 +108,8 @@ class EurojackpotWebScraper:
         return None
 
     def fetch_draws_range(self, start_date: str, end_date: str) -> List[Dict[str, Any]]:
-        """Fetch draws within date range."""
+        """Fetch draws within date range, supporting direct session GET (mocked in tests)."""
         try:
-            # Προσπάθεια ανάκτησης εύρους από δημόσια πηγή
             url = f"https://api.opap.gr/games/v1.0/games/5104/draw-date/{start_date}/{end_date}"
             response = self.session.get(url, timeout=self.REQUEST_TIMEOUT)
             if response.status_code == 200:
@@ -122,13 +121,11 @@ class EurojackpotWebScraper:
                         parsed = self._parse_draw(raw)
                         if parsed:
                             parsed_list.append(parsed)
-                    return parsed_list
+                    if parsed_list:
+                        return parsed_list
         except Exception as exc:
-            logger.debug("OPAP range request failed: %s", exc)
+            logger.debug("Range request failed: %s", exc)
 
-        latest = self.fetch_latest_draw()
-        if latest:
-            return [latest]
         return []
 
     def fetch_year_draws(self, year: int) -> List[Dict[str, Any]]:
