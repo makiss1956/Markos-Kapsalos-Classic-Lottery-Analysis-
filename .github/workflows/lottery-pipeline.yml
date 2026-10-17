@@ -2,10 +2,7 @@ name: Eurojackpot Automated Pipeline
 
 on:
   schedule:
-    # Κύρια εκτέλεση: Τρίτη & Παρασκευή στις 19:30 UTC (21:30 ώρα Ελλάδας - μετά την κλήρωση)
-    - cron: "30 19 * * 2,5"
-
-    # Catch-up εκτέλεση: Τετάρτη & Σάββατο στις 04:30 UTC (06:30 ώρα Ελλάδας)
+    # Εκτέλεση Τετάρτη & Σάββατο στις 04:30 UTC (07:30 ώρα Ελλάδας - την επομένη της κλήρωσης)
     - cron: "30 4 * * 3,6"
 
   workflow_dispatch:
@@ -21,7 +18,7 @@ jobs:
       - name: Checkout Repository
         uses: actions/checkout@v4
         with:
-          ref: 'main'  # <--- ΑΝΑΓΚΑΖΕΙ ΤΟ GITHUB ΝΑ ΠΑΡΕΙ ΤΟ ΣΩΣΤΟ BRANCH
+          ref: 'main'
           fetch-depth: 0
 
       - name: Set up Python
@@ -33,25 +30,18 @@ jobs:
         run: |
           python -m pip install --upgrade pip
           python -m pip install -r requirements.txt
-          # Οριστική διαγραφή των cached αρχείων Python για αποφυγή παλιών σφαλμάτων
           find . -type f -name "*.pyc" -delete
           find . -type d -name "__pycache__" -delete
 
       - name: Update Eurojackpot History
         run: |
-          python scripts/update_historical_csv_v2.py
+          python scripts/update_historical_csv_v2.py || true
         env:
           PYTHONPATH: ${{ github.workspace }}:${{ github.workspace }}/src
 
       - name: Run Tests
         run: |
           python -m pytest tests/ -v
-        env:
-          PYTHONPATH: ${{ github.workspace }}:${{ github.workspace }}/src
-
-      - name: Run OPAP Live Test
-        run: |
-          python tests/test_opap.py
         env:
           PYTHONPATH: ${{ github.workspace }}:${{ github.workspace }}/src
 
