@@ -1,10 +1,6 @@
 """
 Eurojackpot Web Scraper.
-Uses robust open European public APIs (bypassing OPAP restrictions completely).
-The scraper provides:
-- latest draw from open European public endpoints
-- draws for a date range / history matching
-- strict validation of 5 main + 2 Euro numbers
+Uses robust open European public APIs with full test compatibility.
 """
 from __future__ import annotations
 import calendar
@@ -17,10 +13,9 @@ logger = logging.getLogger(__name__)
 
 
 class EurojackpotWebScraper:
-    """Retrieve Eurojackpot draws from open, bot-friendly European public APIs."""
+    """Retrieve Eurojackpot draws from open European public APIs and test mocks."""
 
     GAME_ID = 5104
-    # Χρήση ανοιχτού ευρωπαϊκού endpoint που δεν μπλοκάρει τα GitHub Actions
     PUBLIC_API_URL = "https://danskespil.dk/scapi/danskespil/numbergames/eurojackpot/completedDrawDates"
     REQUEST_TIMEOUT = 30
 
@@ -41,7 +36,6 @@ class EurojackpotWebScraper:
     def _parse_draw(self, raw_draw: Dict[str, Any]) -> Optional[Dict[str, Any]]:
         """Βοηθητική μέθοδος για τη δομή, το φιλτράρισμα και την επικύρωση των δεδομένων."""
         try:
-            # Υποστήριξη διαφορετικών δομών κλειδιών από δημόσια APIs
             winning_nums = []
             euro_nums = []
             
@@ -94,19 +88,23 @@ class EurojackpotWebScraper:
     # Public API
     # ------------------------------------------------------------------
     def fetch_latest_draw(self) -> Optional[Dict[str, Any]]:
-        """Fetch the latest available Eurojackpot draw from public open API."""
+        """Fetch the latest available Eurojackpot draw."""
         try:
             response = self.session.get(self.PUBLIC_API_URL, timeout=self.REQUEST_TIMEOUT)
             response.raise_for_status()
             data = response.json()
 
-            if not isinstance(data, list) or not data:
-                logger.warning("Public API returned empty draw list.")
+            raw_draws = []
+            if isinstance(data, list):
+                raw_draws = data
+            elif isinstance(data, dict):
+                raw_draws = data.get("content", []) or data.get("draws", []) or [data]
+
+            if not raw_draws:
                 return None
 
-            # Ταξινόμηση ανά ημερομηνία για να βεβαιωθούμε ότι παίρνουμε την πιο πρόσφατη
             parsed_draws = []
-            for item in data:
+            for item in raw_draws:
                 parsed = self._parse_draw(item)
                 if parsed:
                     parsed_draws.append(parsed)
@@ -116,11 +114,11 @@ class EurojackpotWebScraper:
 
             parsed_draws.sort(key=lambda d: d["draw_date"], reverse=True)
             latest = parsed_draws[0]
-            logger.info("Latest Public API draw: %s | Main=%s | Euro=%s", latest["draw_date"], latest["primary_numbers"], latest["euro_numbers"])
+            logger.info("Latest draw: %s | Main=%s | Euro=%s", latest["draw_date"], latest["primary_numbers"], latest["euro_numbers"])
             return latest
 
         except Exception as exc:
-            logger.error("Failed to retrieve from public API: %s", exc)
+            logger.error("Failed to retrieve draw: %s", exc)
             return None
 
     def fetch_draws_range(self, start_date: str, end_date: str) -> List[Dict[str, Any]]:
@@ -130,14 +128,20 @@ class EurojackpotWebScraper:
             response.raise_for_status()
             data = response.json()
 
-            if not isinstance(data, list):
+            raw_draws = []
+            if isinstance(data, list):
+                raw_draws = data
+            elif isinstance(data, dict):
+                raw_draws = data.get("content", []) or data.get("draws", []) or [data]
+
+            if not raw_draws:
                 return []
 
             start_dt = datetime.strptime(start_date, "%Y-%m-%d")
             end_dt = datetime.strptime(end_date, "%Y-%m-%d")
 
             filtered_draws = []
-            for item in data:
+            for item in raw_draws:
                 parsed = self._parse_draw(item)
                 if parsed:
                     draw_dt = datetime.strptime(parsed["draw_date"], "%Y-%m-%d")
@@ -147,7 +151,7 @@ class EurojackpotWebScraper:
             filtered_draws.sort(key=lambda d: d["draw_date"])
             return filtered_draws
         except Exception as exc:
-            logger.error("Public API range request failed for %s - %s: %s", start_date, end_date, exc)
+            logger.error("Range request failed for %s - %s: %s", start_date, end_date, exc)
             return []
 
     def fetch_year_draws(self, year: int) -> List[Dict[str, Any]]:
