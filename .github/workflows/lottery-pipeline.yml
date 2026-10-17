@@ -21,6 +21,7 @@ jobs:
       - name: Checkout Repository
         uses: actions/checkout@v4
         with:
+          ref: 'main'  # <--- ΑΝΑΓΚΑΖΕΙ ΤΟ GITHUB ΝΑ ΠΑΡΕΙ ΤΟ ΣΩΣΤΟ BRANCH
           fetch-depth: 0
 
       - name: Set up Python
