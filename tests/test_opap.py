@@ -1,0 +1,52 @@
+import requests
+import json
+from datetime import datetime, timedelta
+
+GAME_ID = 5104
+# Το 100% σωστό URL για να πάρουμε τις πρόσφατες κληρώσεις
+url = f"https://opap.gr{GAME_ID}/last-results"
+
+print("=" * 60)
+print(f"Δοκιμαστική κλήση στο επίσημο API του ΟΠΑΠ...")
+print(f"URL: {url}")
+print("=" * 60)
+
+try:
+    headers = {"Accept": "application/json", "User-Agent": "Mozilla/5.0"}
+    response = requests.get(url, headers=headers, timeout=10)
+    
+    if response.status_code == 200:
+        data = response.json()
+        print(f"✅ Η σύνδεση ΠΕΤΥΧΕ! (Status Code: 200)")
+        
+        # Παίρνουμε την τελευταία κλήρωση (τη χθεσινή)
+        if isinstance(data, list) and len(data) > 0:
+            latest_draw = data[0]
+        elif isinstance(data, dict) and "content" in data and len(data["content"]) > 0:
+            latest_draw = data["content"][0]
+        else:
+            latest_draw = data
+            
+        print("\n--- ΧΘΕΣΙΝΗ ΚΛΗΡΩΣΗ (Ή ΠΙΟ ΠΡΟΣΦΑΤΗ) ---")
+        print(f"ID Κλήρωσης: {latest_draw.get('drawId')}")
+        
+        # Μετατροπή timestamp σε κανονική ημερομηνία
+        draw_time = latest_draw.get('drawTime')
+        if draw_time:
+            date_str = datetime.fromtimestamp(draw_time / 1000).strftime('%Y-%m-%d %H:%M')
+            print(f"Ημερομηνία:  {date_str}")
+            
+        wn = latest_draw.get('winningNumbers', {})
+        main_nums = wn.get('list', [])
+        euro_nums = wn.get('sideClassNum', []) or wn.get('sideClassNumbers', {}).get('list', [])
+        
+        print(f"Βασικοί Αριθμοί (5): {sorted(main_nums)}")
+        print(f"Euro Αριθμοί (2):    {sorted(euro_nums)}")
+        print("-" * 35)
+        
+    else:
+        print(f"❌ Απέτυχε η σύνδεση. Κωδικός σφάλματος: {response.status_code}")
+        print(response.text[:200])
+
+except Exception as e:
+    print(f"❌ Προέκυψε σφάλμα κατά την εκτέλεση: {e}")
