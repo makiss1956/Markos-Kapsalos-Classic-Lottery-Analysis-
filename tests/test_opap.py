@@ -3,8 +3,7 @@ import json
 from datetime import datetime
 
 GAME_ID = 5104
-# Το 100% σωστό URL της επίσημης πλατφόρμας του ΟΠΑΠ
-url = f"https://opap.gr{GAME_ID}/last-results"
+url = f"https://api.opap.gr/games/v1.0/games/{GAME_ID}/last-results"
 
 print("=" * 60)
 print(f"Δοκιμαστική κλήση στο επίσημο API του ΟΠΑΠ...")
@@ -19,7 +18,6 @@ try:
         data = response.json()
         print(f"✅ Η σύνδεση ΠΕΤΥΧΕ! (Status Code: 200)")
         
-        # Εξαγωγή της τελευταίας κλήρωσης
         if isinstance(data, list) and len(data) > 0:
             latest_draw = data[0]
         elif isinstance(data, dict) and "content" in data and len(data["content"]) > 0:
@@ -27,12 +25,11 @@ try:
         else:
             latest_draw = data
             
-        print("\n--- ΧΘΕΣΙΝΗ ΚΛΗΡΩΣΗ (Ή ΠΙΟ ΠΡΟΣΦΑΤΗ) ---")
+        print("\n--- ΤΕΛΕΥΤΑΙΑ ΚΛΗΡΩΣΗ ---")
         print(f"ID Κλήρωσης: {latest_draw.get('drawId')}")
         
         draw_time = latest_draw.get('drawTime')
         if draw_time:
-            # Μετατροπή των milliseconds σε κανονική ημερομηνία
             date_str = datetime.fromtimestamp(draw_time / 1000).strftime('%Y-%m-%d %H:%M')
             print(f"Ημερομηνία:  {date_str}")
             
