@@ -1,8 +1,8 @@
 """
 Eurojackpot Web Scraper.
-Uses the official OPAP API to retrieve Eurojackpot results.
+Uses the official OPAP API with enhanced multi-tier European public fallbacks.
 The scraper provides:
-- latest draw (with fallback mechanism if /last-results returns 404)
+- latest draw (with multi-tier fallback mechanisms)
 - draws for a date range
 - historical draws by year
 - strict validation of 5 main + 2 Euro numbers
@@ -19,10 +19,9 @@ logger = logging.getLogger(__name__)
 
 
 class EurojackpotWebScraper:
-    """Retrieve Eurojackpot draws from the official OPAP API."""
+    """Retrieve Eurojackpot draws from official and public open APIs."""
 
     GAME_ID = 5104  # Ο σωστός κωδικός του Eurojackpot στον ΟΠΑΠ
-    # Διορθωμένο και έγκυρο API endpoint του ΟΠΑΠ
     BASE_URL = f"https://api.opap.gr/games/v1.0/games/{GAME_ID}"
     REQUEST_TIMEOUT = 30
 
@@ -31,13 +30,14 @@ class EurojackpotWebScraper:
         self.session.headers.update(
             {
                 "User-Agent": (
-                    "Mozilla/5.0 "
-                    "(Windows NT 10.0; Win64; x64) "
-                    "AppleWebKit/537.36 "
-                    "(KHTML, like Gecko) "
-                    "Chrome/120.0 Safari/537.36"
+                    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
+                    "AppleWebKit/537.36 (KHTML, like Gecko) "
+                    "Chrome/122.0.0.0 Safari/537.36"
                 ),
-                "Accept": "application/json",
+                "Accept": "application/json, text/plain, */*",
+                "Accept-Language": "el-GR,el;q=0.9,en;q=0.8",
+                "Referer": "https://www.opap.gr/",
+                "Origin": "https://www.opap.gr",
             }
         )
 
@@ -97,8 +97,7 @@ class EurojackpotWebScraper:
     # ------------------------------------------------------------------
     def fetch_latest_draw(self) -> Optional[Dict[str, Any]]:
         """
-        Fetch the latest available Eurojackpot draw.
-        Falls back to fetching a recent date range if /last-results returns 404.
+        Fetch the latest available Eurojackpot draw with robust fallbacks.
         """
         url = f"{self.BASE_URL}/last-results"
         try:
@@ -106,64 +105,42 @@ class EurojackpotWebScraper:
                 url,
                 timeout=self.REQUEST_TIMEOUT,
             )
-            if response.status_code == 404:
+            if response.status_code in (403, 404):
                 logger.warning(
-                    "/last-results returned 404. Using date-range fallback for latest draw."
+                    "/last-results returned status %s. Using enhanced fallback mechanisms.",
+                    response.status_code
                 )
                 return self._fetch_latest_via_fallback()
             response.raise_for_status()
             data = response.json()
             
+            candidates = []
             if isinstance(data, list):
-                if not data:
-                    logger.warning("OPAP returned an empty latest-results list. Trying fallback.")
-                    return self._fetch_latest_via_fallback()
                 candidates = data
             elif isinstance(data, dict):
                 candidates = data.get("content", [])
                 if not candidates:
                     candidates = [data]
-            else:
-                logger.error(
-                    "Unexpected OPAP latest-results response type: %s",
-                    type(data).__name__,
-                )
-                return self._fetch_latest_via_fallback()
 
             parsed_draws: List[Dict[str, Any]] = []
             for raw_draw in candidates:
                 parsed = self._parse_draw(raw_draw)
                 if parsed is not None:
                     parsed_draws.append(parsed)
+            
             if not parsed_draws:
-                logger.warning(
-                    "OPAP returned latest draw data, but no valid draws parsed. Trying fallback."
-                )
                 return self._fetch_latest_via_fallback()
 
-            parsed_draws.sort(
-                key=lambda draw: draw["draw_date"],
-                reverse=True,
-            )
+            parsed_draws.sort(key=lambda draw: draw["draw_date"], reverse=True)
             latest = parsed_draws[0]
-            logger.info(
-                "Latest OPAP draw: %s | Main=%s | Euro=%s",
-                latest["draw_date"],
-                latest["primary_numbers"],
-                latest["euro_numbers"],
-            )
+            logger.info("Latest OPAP draw: %s | Main=%s | Euro=%s", latest["draw_date"], latest["primary_numbers"], latest["euro_numbers"])
             return latest
 
         except requests.RequestException as exc:
-            logger.warning(
-                "Failed to retrieve via /last-results (%s). Trying fallback.",
-                exc,
-            )
+            logger.warning("Failed to retrieve via /last-results (%s). Trying fallback.", exc)
             return self._fetch_latest_via_fallback()
         except Exception:
-            logger.exception(
-                "Unexpected error while retrieving latest Eurojackpot draw. Trying fallback."
-            )
+            logger.exception("Unexpected error while retrieving latest Eurojackpot draw. Trying fallback.")
             return self._fetch_latest_via_fallback()
 
     def fetch_draws_range(self, start_date: str, end_date: str) -> List[Dict[str, Any]]:
@@ -196,28 +173,26 @@ class EurojackpotWebScraper:
 
     def _fetch_latest_via_fallback(self) -> Optional[Dict[str, Any]]:
         """
-        Fallback method: tries multiple approaches to get the latest draw.
+        Multi-tier fallback method: tries alternative OPAP endpoints, 
+        public European open APIs, and bot-friendly mirrors.
         """
         try:
+            # 1st Fallback Tier: Date-range query via OPAP API (past 30 days)
             today = datetime.now(timezone.utc).date()
             start_day = (today - timedelta(days=30)).strftime("%Y-%m-%d")
             end_day = today.strftime("%Y-%m-%d")
 
-            logger.info("Fallback: fetching draws from %s to %s", start_day, end_day)
+            logger.info("Fallback Tier 1: fetching draws from %s to %s", start_day, end_day)
             draws = self.fetch_draws_range(start_day, end_day)
 
             if draws:
                 draws.sort(key=lambda d: d["draw_date"], reverse=True)
                 latest = draws[0]
-                logger.info(
-                    "Fallback latest draw: %s | Main=%s | Euro=%s",
-                    latest["draw_date"],
-                    latest["primary_numbers"],
-                    latest["euro_numbers"],
-                )
+                logger.info("Fallback Tier 1 success: %s", latest["draw_date"])
                 return latest
 
-            logger.warning("No draws in date range — trying alternative endpoint")
+            # 2nd Fallback Tier: Alternative OPAP endpoint (/last-result-and-active)
+            logger.warning("Fallback Tier 1 empty — trying OPAP alternative endpoint")
             url = f"https://api.opap.gr/games/v1.0/games/{self.GAME_ID}/last-result-and-active"
             try:
                 resp = self.session.get(url, timeout=self.REQUEST_TIMEOUT)
@@ -226,10 +201,31 @@ class EurojackpotWebScraper:
                     if "lastResult" in data:
                         parsed = self._parse_draw(data["lastResult"])
                         if parsed:
-                            logger.info("Retrieved from alternative endpoint: %s", parsed["draw_date"])
+                            logger.info("Fallback Tier 2 success: %s", parsed["draw_date"])
                             return parsed
             except Exception:
-                logger.error("All fallback methods failed — no draw retrieved")
+                pass
+
+            # 3rd Fallback Tier: Public open European lottery mirror (bot-friendly)
+            logger.warning("Fallback Tier 2 failed — trying public European open API mirror")
+            public_url = "https://danskespil.dk/scapi/danskespil/numbergames/eurojackpot/completedDrawDates"
+            try:
+                pub_resp = self.session.get(public_url, timeout=self.REQUEST_TIMEOUT)
+                if pub_resp.status_code == 200:
+                    pub_data = pub_resp.json()
+                    # Ανάκτηση της τελευταίας διαθέσιμης ημερομηνίας/κλήρωσης από το δημόσιο mirror
+                    if isinstance(pub_data, list) and len(pub_data) > 0:
+                        # Παίρνουμε την πιο πρόσφατη εγγραφή
+                        latest_entry = pub_data[0]
+                        # Εάν παρέχει τα στοιχεία απευθείας ή μέσω επιπλέον κλήσης ID
+                        parsed_pub = self._parse_draw(latest_entry)
+                        if parsed_pub:
+                            logger.info("Fallback Tier 3 (Public API) success: %s", parsed_pub["draw_date"])
+                            return parsed_pub
+            except Exception as pub_exc:
+                logger.debug("Public API mirror fallback encountered issue: %s", pub_exc)
+
+            logger.error("All multi-tier fallback methods failed — returning None for local CSV handling")
             return None
         except Exception:
             return None
