@@ -1,3 +1,11 @@
+      # Προσθέστε αυτό το βήμα για να δούμε τα αποτελέσματα του τεστ:
+      - name: Run OPAP Live Test
+        run: |
+          python tests/test_opap.py
+
+      - name: Run Full Pipeline
+        run: |
+          python src/main.py
 name: Eurojackpot Automated Pipeline
 
 on:
