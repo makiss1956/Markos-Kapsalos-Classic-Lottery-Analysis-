@@ -32,6 +32,9 @@ jobs:
         run: |
           python -m pip install --upgrade pip
           python -m pip install -r requirements.txt
+          # Οριστική διαγραφή των cached αρχείων Python για αποφυγή παλιών σφαλμάτων
+          find . -type f -name "*.pyc" -delete
+          find . -type d -name "__pycache__" -delete
 
       - name: Update Eurojackpot History
         run: |
