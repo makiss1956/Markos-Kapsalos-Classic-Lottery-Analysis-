@@ -8,7 +8,7 @@ on:
 
 jobs:
   run-audit:
-  runs-on: ubuntu-latest
+    runs-on: ubuntu-latest
   
     permissions:
       contents: write # Επιτρέπει στο GitHub να αποθηκεύει τα νέα logs πίσω στο repository
