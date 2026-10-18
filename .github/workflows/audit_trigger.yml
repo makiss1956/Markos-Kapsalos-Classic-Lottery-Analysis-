@@ -1,0 +1,34 @@
+name: Stochastic Recurrence Audit
+
+on:
+  push:
+    paths:
+      - 'data/**'  # Ενεργοποιείται αυτόματα μόνο όταν αλλάζει κάτι στον φάκελο data/
+  workflow_dispatch: # Δίνει δυνατότητα να το τρέξεις και με το χέρι από το site του GitHub
+
+jobs:
+  run-audit:
+  runs-on: ubuntu-latest
+  
+    permissions:
+      contents: write # Επιτρέπει στο GitHub να αποθηκεύει τα νέα logs πίσω στο repository
+
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v4
+
+    - name: Set up Python
+      uses: actions/setup-python@v5
+      with:
+        python-version: '3.10'
+
+    - name: Run audit script
+      run: |
+        python run_audit.py
+
+    - name: Commit and push updated logs
+      run: |
+        git config --global user.name "GitHub Actions Bot"
+        git config --global user.email "actions@github.com"
+        git add logs/recurrence_audit.log
+        git diff --quiet && git diff --staged --quiet || (git commit -m "Auto-update recurrence audit log [skip ci]" && git push)
