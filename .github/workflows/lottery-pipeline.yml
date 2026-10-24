@@ -35,7 +35,7 @@ jobs:
 
       - name: Update Eurojackpot History
         run: |
-          python scripts/update_historical_csv_v2.py || true
+          python update_eurojackpot.py
         env:
           PYTHONPATH: ${{ github.workspace }}:${{ github.workspace }}/src
 
