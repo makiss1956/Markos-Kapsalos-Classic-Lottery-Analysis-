@@ -1,7 +1,7 @@
 import os
 import pandas as pd
 
-# Διορθωμένο URL με το branch 'master'
+# Αξιόπιστη Raw πηγή δεδομένων Eurojackpot (branch master)
 REMOTE_CSV_URL = "https://raw.githubusercontent.com/szczyglis-dev/python-lottery-dataset-analyze/master/eurojackpot.csv"
 LOCAL_CSV_PATH = "data/eurojackpot_raw_history.csv"
 
@@ -17,8 +17,9 @@ def update_dataset():
     # Δημιουργία φακέλου data αν δεν υπάρχει
     os.makedirs(os.path.dirname(LOCAL_CSV_PATH), exist_ok=True)
 
-    # Αποθήκευση στο ακριβές μονοπάτι του έργου σας
-    df_remote.to_csv(LOCAL_CSV_PATH, index=False)
+    # Αποθήκευση με διαχωριστικό ερωτηματικό (';') 
+    # ώστε να ταιριάζει απόλυτα με τη δομή του project σας
+    df_remote.to_csv(LOCAL_CSV_PATH, index=False, sep=';')
     print(f"Το αρχείο {LOCAL_CSV_PATH} ενημερώθηκε επιτυχώς!")
 
 if __name__ == "__main__":
