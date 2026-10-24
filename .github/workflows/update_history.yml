@@ -1,35 +1,32 @@
-name: Auto-Update Eurojackpot History
+import os
+import requests
+import pandas as pd
+from io import StringIO
 
-on:
-  schedule:
-    - cron: '30 23 * * 2,5'
-  workflow_dispatch:
+# Απευθείας σύνδεσμος λήψης ενημερωμένου dataset Eurojackpot
+REMOTE_CSV_URL = "https://www.wynikilotto.net.pl/download/eurojackpot.csv"
+LOCAL_CSV_PATH = "data/eurojackpot_raw_history.csv"
 
-jobs:
-  update-history:
-    runs-on: ubuntu-latest
-    permissions:
-      contents: write
-    steps:
-      - name: Checkout Repository
-        uses: actions/checkout@v4
+def update_dataset():
+    print("Λήψη ενημερωμένων δεδομένων Eurojackpot...")
+    try:
+        # Προσθήκη User-Agent για αποφυγή αποκλεισμών
+        headers = {'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)'}
+        response = requests.get(REMOTE_CSV_URL, headers=headers, timeout=15)
+        response.raise_for_status()
+        
+        # Ανάγνωση των δεδομένων CSV από το κείμενο της απόκρισης
+        df_remote = pd.read_csv(StringIO(response.text))
+    except Exception as e:
+        print(f"Σφάλμα κατά τη λήψη των δεδομένων: {e}")
+        return
 
-      - name: Set up Python
-        uses: actions/setup-python@v5
-        with:
-          python-version: '3.10'
+    # Δημιουργία φακέλου data αν δεν υπάρχει
+    os.makedirs(os.path.dirname(LOCAL_CSV_PATH), exist_ok=True)
 
-      - name: Install Dependencies
-        run: |
-          python -m pip install --upgrade pip
-          pip install pandas requests
+    # Αποθήκευση με διαχωριστικό ερωτηματικό (';') για συμβατότητα με το project σας
+    df_remote.to_csv(LOCAL_CSV_PATH, index=False, sep=';')
+    print(f"Το αρχείο {LOCAL_CSV_PATH} ενημερώθηκε επιτυχώς από την πηγή!")
 
-      - name: Run Update Script
-        run: python update_eurojackpot.py
-
-      - name: Commit and Push Changes
-        run: |
-          git config --global user.name 'github-actions[bot]'
-          git config --global user.email 'github-actions[bot]@users.noreply.github.com'
-          git add data/eurojackpot_raw_history.csv
-          git diff --quiet && git diff --staged --quiet || (git commit -m "chore: auto-update eurojackpot raw history [skip ci]" && git push)
+if __name__ == "__main__":
+    update_dataset()
