@@ -14,6 +14,7 @@ Workflow:
 from __future__ import annotations
 import logging
 import sys
+import subprocess
 from pathlib import Path
 from typing import Any, Dict, Optional
 import pandas as pd
@@ -37,7 +38,7 @@ from src.importers.eurojackpot_importer import EurojackpotImporter
 
 
 def append_to_performance_log(draw_date: str, prediction_dict: dict, evaluation: dict, actual_draw: dict):
-    """Προσθέτει ή ενημερώνει το αρχείο καταγραφής επιδόσεων (log) με τις προβλέψεις και τα αποτελέσματα."""
+    """Προσθέτει ή ενημερώνει το αρχείο καταγραφής επιδόσεων (log) και το κάνει αυτόματα commit & push στο GitHub."""
     log_path = ROOT_DIR / "predictions_performance_log.md"
     header = "| Draw Date | Predicted Main | Predicted Euro | Actual Main | Actual Euro | Main Hits | Euro Hits |\n|---|---|---|---|---|---|---|\n"
     
@@ -54,16 +55,27 @@ def append_to_performance_log(draw_date: str, prediction_dict: dict, evaluation:
     row = f"| {draw_date} | {pred_main} | {pred_euro} | {act_main} | {act_euro} | {main_hits}/{total_pred_main} | {euro_hits}/{total_pred_euro} |\n"
     
     try:
-        if not log_path.exists():
+        file_existed = log_path.exists()
+        if not file_existed:
             log_path.write_text(header + row, encoding="utf-8")
         else:
             content = log_path.read_text(encoding="utf-8")
             if row.strip() not in content:
                 with open(log_path, "a", encoding="utf-8") as f:
                     f.write(row)
+        
         logger.info("✅ Το αρχείο καταγραφής (predictions_performance_log.md) ενημερώθηκε επιτυχώς.")
+        
+        # Αυτόματο Git Add, Commit & Push για να φαίνεται στο GitHub
+        subprocess.run(["git", "config", "--global", "user.name", "github-actions[bot]"], check=False)
+        subprocess.run(["git", "config", "--global", "user.email", "github-actions[bot]@users.noreply.github.com"], check=False)
+        subprocess.run(["git", "add", "predictions_performance_log.md"], check=True)
+        subprocess.run(["git", "commit", "-m", f"chore: auto-update performance log for {draw_date} [skip ci]"], check=True)
+        subprocess.run(["git", "push"], check=True)
+        logger.info("🚀 Το αρχείο log ανέβηκε επιτυχώς στο GitHub!")
+        
     except Exception as e:
-        logger.warning("⚠ Αποτυχία ενημέρωσης του αρχείου log: %s", e)
+        logger.warning("⚠ Σφάλμα κατά την ενημέρωση ή το push του αρχείου log: %s", e)
 
 
 def run_pipeline() -> Dict[str, Any]:
@@ -147,7 +159,7 @@ def run_pipeline() -> Dict[str, Any]:
             len(prediction.get("predicted_euro", []))
         )
         
-        # Καταγραφή στο αρχείο log των δραστηριοτήτων
+        # Καταγραφή και αυτόματο push στο GitHub
         append_to_performance_log(latest_date, prediction, evaluated_prediction, latest_draw)
         break
 
