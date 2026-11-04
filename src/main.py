@@ -36,6 +36,36 @@ from src.database.db_manager import DBManager
 from src.importers.eurojackpot_importer import EurojackpotImporter
 
 
+def append_to_performance_log(draw_date: str, prediction_dict: dict, evaluation: dict, actual_draw: dict):
+    """Προσθέτει ή ενημερώνει το αρχείο καταγραφής επιδόσεων (log) με τις προβλέψεις και τα αποτελέσματα."""
+    log_path = ROOT_DIR / "predictions_performance_log.md"
+    header = "| Draw Date | Predicted Main | Predicted Euro | Actual Main | Actual Euro | Main Hits | Euro Hits |\n|---|---|---|---|---|---|---|\n"
+    
+    pred_main = sorted(prediction_dict.get("predicted_primary", []))
+    pred_euro = sorted(prediction_dict.get("predicted_euro", []))
+    act_main = sorted(actual_draw.get("primary_numbers", []))
+    act_euro = sorted(actual_draw.get("euro_numbers", []))
+    
+    main_hits = evaluation.get("main_hits_count", 0)
+    euro_hits = evaluation.get("euro_hits_count", 0)
+    total_pred_main = len(pred_main)
+    total_pred_euro = len(pred_euro)
+    
+    row = f"| {draw_date} | {pred_main} | {pred_euro} | {act_main} | {act_euro} | {main_hits}/{total_pred_main} | {euro_hits}/{total_pred_euro} |\n"
+    
+    try:
+        if not log_path.exists():
+            log_path.write_text(header + row, encoding="utf-8")
+        else:
+            content = log_path.read_text(encoding="utf-8")
+            if row.strip() not in content:
+                with open(log_path, "a", encoding="utf-8") as f:
+                    f.write(row)
+        logger.info("✅ Το αρχείο καταγραφής (predictions_performance_log.md) ενημερώθηκε επιτυχώς.")
+    except Exception as e:
+        logger.warning("⚠ Αποτυχία ενημέρωσης του αρχείου log: %s", e)
+
+
 def run_pipeline() -> Dict[str, Any]:
     logger.info("=" * 70)
     logger.info("LOTTERY INTELLIGENCE PLATFORM - ENHANCED PIPELINE")
@@ -116,6 +146,9 @@ def run_pipeline() -> Dict[str, Any]:
             evaluated_prediction.get("euro_hits_count", 0),
             len(prediction.get("predicted_euro", []))
         )
+        
+        # Καταγραφή στο αρχείο log των δραστηριοτήτων
+        append_to_performance_log(latest_date, prediction, evaluated_prediction, latest_draw)
         break
 
     if evaluated_prediction is None:
@@ -133,38 +166,30 @@ def run_pipeline() -> Dict[str, Any]:
     # ---------------------------------------------------------
     logger.info("STEP 7 - Generate Prediction with Roll-over / Winner Analysis")
     
-    # Διορθωμένη διαδρομή σύμφωνα με το GitHub repository σας
     csv_file_path = "data/eurojackpot_raw_history.csv"
     try:
         df_history = pd.read_csv(csv_file_path, sep=';')
-        # Μετατροπή Status σε αριθμητικό (1 για JACKPOT/Roll-over, 0 για WINNER)
         df_history['Is_Jackpot'] = df_history['Status'].apply(lambda x: 1 if str(x).strip().upper() == 'JACKPOT' else 0)
         
-        # Διαχωρισμός σε υποομάδες ιστορικού
         roll_over_pool = df_history[df_history['Is_Jackpot'] == 1]
         winner_pool = df_history[df_history['Is_Jackpot'] == 0]
 
-        # Αυτόνομη πρόβλεψη κατάστασης (Pure Python) με βάση την τελευταία τιμή
         last_status_val = df_history.iloc[-1]['Is_Jackpot']
         next_status_pred = 1 if last_status_val == 1 else 0
         next_status_str = "JACKPOT (Roll-over)" if next_status_pred == 1 else "WINNER"
         logger.info("1. Εκτίμηση επόμενης κλήρωσης (Roll-over/Winner): %s", next_status_str)
         
-        # Επιλογή της κατάλληλης δεξαμενής δεδομένων με βάση την πρόβλεψη κατάστασης
         target_pool = roll_over_pool if next_status_pred == 1 else winner_pool
         
-        # Υπολογισμός συχνοτήτων αποκλειστικά από την επιλεγμένη ομάδα
         main_series = pd.concat([target_pool['N1'], target_pool['N2'], target_pool['N3'], target_pool['N4'], target_pool['N5']])
         euro_series = pd.concat([target_pool['E1'], target_pool['E2']])
         
         top_mains = main_series.value_counts().index.tolist()
         top_euros = euro_series.value_counts().index.tolist()
         
-        # 2. Πρόβλεψη 5 + 2
         primary_candidates_5_2 = sorted(top_mains[:5])
         euro_candidates_5_2 = sorted(top_euros[:2])
         
-        # 3. Πρόβλεψη 3 κύριοι αριθμοί + 1 Τζόκερ/Euro
         primary_candidates_3_1 = sorted(top_mains[:3])
         euro_candidates_3_1 = sorted(top_euros[:1])
         
